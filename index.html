@@ -72,20 +72,32 @@
       
       <pre class="example highlight">
 
-            var contactName = new ContactName({
-              givenNames: ['John'],
-              familyNames: ['Doe']
-              });
-            var mobilePhone = new ContactTelField({ types: ['home'], preferred: true, value: '+34698765432' });
-            var contact = new Contact({
-              name: contactName,
-              phoneNumbers: [mobilePhone]
-              });
-            navigator.contacts.save(contact).done(
-               function(contact) { window.console.log('Contact  ' +
+            navigator.getDataStores('contacts').then(function(stores) {
+               if (!stores.length)
+                   return;
+               var store = stores[0];
+
+               // Create a contact.
+               var contactName = new ContactName({
+                   givenNames: ['John'],
+                   familyNames: ['Doe']
+               });
+               var mobilePhone = new ContactTelField({ types: ['home'], preferred: true, value: '+34698765432' });
+               var contact = new Contact({
+                   name: contactName,
+                   phoneNumbers: [mobilePhone]
+               });
+               
+               // Add new contact to the store.
+               store.insert(contact).then(function(id) {
+                   console.log('Contact ' +
                       contact.name.givenNames[0] + ' ' +
-                      contact.name.familyNames[0] + ' saved!'); },
-               function(error) {   window.console.error('Error: ' + error); } )
+                      contact.name.familyNames[0] + ' saved with id: ' +
+                      id);
+               }, function(error) {
+                   console.error('Error: ' + error);
+               });
+            });
 
       </pre>
     </section>
@@ -123,14 +135,9 @@
       event handler event types</a></dfn> are defined in [[!HTML5]].
       
       <p>The <dfn><a
-      href="http://dom.spec.whatwg.org/#promise">Promise</a></dfn> interface,
-      the concepts of a <a href=
-      "http://dom.spec.whatwg.org/#concept-resolver"><dfn>resolver</dfn></a>, a
-      <dfn id="dfn-fulfill-algorithm"><a
-      href="http://dom.spec.whatwg.org/#concept-resolver-fulfill"> resolver's
-      fulfill algorithm</a></dfn> and a <dfn id="dfn-reject-algorithm"><a
-      href="http://dom.spec.whatwg.org/#concept-resolver-reject"> resolver's
-      reject algorithm</a></dfn> are defined in [[DOM4]].</p>
+      href="http://airpingu.github.io/data-store-api/index.html#datastore-interface">DataStore</a></dfn> interface
+      and the <dfn><a href="http://airpingu.github.io/data-store-api/index.html#idl-def-DataStoreKey">DataStoreKey</a></dfn>
+      type identifier are defined in [[!DATASTORE]].</p>
   
     </section>
 
@@ -141,442 +148,34 @@
       
     </section>
 
+    <!-- Data Store integration -->
     <section>
-      <h2><a>Navigator</a> Interface</h2>
-       <dl title="partial interface Navigator" class="idl">
-        <dt>readonly attribute ContactsManager contacts</dt>
-        <dd>
-          The object that exposes the contacts management functionality.
-        </dd>
-      </dl>
-    </section>
-    
-    <!-- - - - - - - - - ContactsManager Interface - - - - - - - - - - - - - -->
-    <section>
-      <h2><a>ContactsManager</a> Interface</h2>
-      <p>The <a>ContactsManager</a> interface exposes the contacts management
-      functionality.
-      
-      <dl title="interface ContactsManager : EventTarget"
-          class="idl">
-        <dt> Promise find ()</dt>
-        <dd>This method allows to search contacts within the address book that
-        match the criteria indicated in the <code>options</code> parameter.
-        It returns a <a><code>Promise</code></a> that will allow the caller to
-        be notified about the result of the operation. 
-        <dl class='parameters'>
-             <dt>optional ContactFindOptions options</dt>
-             <dd>
-               Set of criteria that a contact needs to match to be included in
-               the outcomes of the <code>find</code>
-               operation. 
-             </dd>
-         </dl>
-        </dd>
+      <h2>Access the contacts data stores</h2>
+       <p>The contacts data stores can be retrieved using the <code>getDataStores()</code> function on <code>Navigator</code>, as defined
+       in the Data Store API [[DATASTORE]], using <code>"contacts"</code> as label. This function returns an array of <a><code>DataStore</code></a>
+       objects asynchronously that can be used to get, update or insert <code>Contact</code> objects.</p>
+       <pre class="example highlight">
 
-        <dt> Promise clear ()</dt>
-        <dd>This method allows to remove all contacts in the address book.
-        It returns a <a><code>Promise</code></a> that will allow the caller to
-        be notified about the result of the operation. 
+           navigator.getDataStores('contacts').then(function(stores) {
+               if (!stores.length)
+                   return;
+               var store = stores[0];
+               // ...
+           });
 
-        </dd>
-
-        <dt> Promise save ()</dt>
-        <dd>This method allows to save a contact in the address book, e.g. an
-        existing contact after having been edited. So if a contact with the same
-        identifier, i.e. <code>id</code>, already exists in the address book, it
-        will be updated.
-        It returns a <a><code>Promise</code></a> that will allow the caller to
-        be notified about the result of the operation. 
-        <dl class='parameters'>
-             <dt>Contact contact</dt>
-             <dd>
-               The <code>Contact</code> object that is requested to be saved in
-               the address book.
-             </dd>
-         </dl>
-        </dd>
-
-        <dt> Promise remove ()</dt>
-        <dd>This method allows to remove a contact from the address book.
-        It returns a <a><code>Promise</code></a> that will allow the caller to
-        be notified about the result of the operation. 
-        <dl class='parameters'>
-             <dt>DOMString contactId</dt>
-             <dd>
-               The identifier of the <code>Contact</code> object that is
-               requested to be removed from the address book.
-             </dd>
-         </dl>
-        </dd>
-
-        <dt class="no-docs">
-          attribute EventHandler oncontactschange
-        </dt>
-        <dd>May be used to set an event handler to be called when contacts are
-        added, deleted or changed in some way.</dd>
-      </dl>
-
-      <p> The <dfn><code>find</code></dfn> method when invoked MUST run the
-      following steps:
-        <ol>
-          <li>Let <var>promise</var> be a new <a><code>Promise</code></a> object
-          and <var>resolver</var> its associated resolver.
-          <li>Return <var>promise</var> and continue the following steps
-          asynchronously.
-          <li>Make a request to the system to retrieve the contacts in the
-          address book matching the criteria indicated in the
-          <code>options</code> parameter.
-          <li>If there is an error invoke <em>resolver</em>'s <a
-          class="internalDFN" href="#dfn-reject-algorithm">reject algorithm</a>
-          with no argument and terminate these steps.
-          <li>When the request has been completed:
-          <ol>
-            <li>Let <em>contacts</em> be a new array of
-            <a><code>Contact</code></a> objects providing the results of the
-            find operation.
-            <li>Invoke <em>resolver</em>'s <a class="internalDFN"
-            href="#dfn-fulfill-algorithm">fulfill algorithm</a> with
-            <em>contacts</em> as the <code>value</code> argument.
-         </ol>
-        </ol>
-
-      <p> The <dfn><code>clear</code></dfn> method when invoked MUST run the
-      following steps:
-        <ol>
-          <li>Let <var>promise</var> be a new <a><code>Promise</code></a> object
-          and <var>resolver</var> its associated resolver.
-          <li>Return <var>promise</var> and continue the following steps
-          asynchronously.
-          <li>Make a request to the system to clear all the contacts in the
-          address book.
-          <li>If there is an error invoke <em>resolver</em>'s <a class="internalDFN"
-          href="#dfn-reject-algorithm">reject algorithm</a> with no argument and
-          terminate these steps.
-          <li>When the request has been completed invoke <em>resolver</em>'s <a
-          class="internalDFN" href="#dfn-fulfill-algorithm">fulfill
-          algorithm</a> with no argument and terminate these steps.
-        </ol>
-
-      <p> The <dfn><code>save</code></dfn> method when invoked MUST run the
-      following steps:
-        <ol>
-          <li>Let <var>promise</var> be a new <a><code>Promise</code></a> object
-          and <var>resolver</var> its associated resolver.
-          <li>Return <var>promise</var> and continue the following steps
-          asynchronously.
-          <li>Make a request to the system to save in the address book the
-          <a><code>Contact</code></a> object passed as parameter.
-          <li>If there is an error invoke <em>resolver</em>'s <a
-          class="internalDFN" href="#dfn-reject-algorithm">reject algorithm</a>
-          with no argument and terminate these steps.
-          <li>When the request has been completed:
-          <ol>
-            <li>Let <em>contact</em> be the <a><code>Contact</code></a> object
-            as returned by the system, and which therefore has its
-            <code>id</code> and <code>lastUpdated</code> parameters set, whereas
-            they could be null in the original <a><code>Contact</code></a>
-            object passed as parameter, for instance if it is a brand new
-            <a><code>Contact</code></a> object not yet stored in the address
-            book.
-            <li>Invoke <em>resolver</em>'s <a class="internalDFN"
-            href="#dfn-fulfill-algorithm">fulfill algorithm</a> with
-            <em>contact</em> as the <code>value</code> argument.
-         </ol>
-       </ol>
-
-      <p> The <dfn><code>remove</code></dfn> method when invoked MUST run the
-      following steps:
-        <ol>
-          <li>Let <var>promise</var> be a new <a><code>Promise</code></a> object
-          and <var>resolver</var> its associated resolver.
-          <li>Return <var>promise</var> and continue the following steps
-          asynchronously.
-          <li>Make a request to the system to remove the
-          <a><code>Contact</code></a> object identified by the
-          <code>contactId</code> passed as parameter from the address book.
-          <li>If there is an error invoke <em>resolver</em>'s <a
-          class="internalDFN" href="#dfn-reject-algorithm">reject algorithm</a>
-          with no argument and terminate these steps.
-          <li>When the request has been completed invoke <em>resolver</em>'s <a
-          class="internalDFN" href="#dfn-fulfill-algorithm">fulfill
-          algorithm</a> with no argument and terminate these steps.
-       </ol>
-
-      <p> Upon a change in a contact or set thereof is performed (i.e.
-      contact(s) added / modified / removed) the system MUST <a>fire a simple
-      event</a> named <a><code>contactschange</code></a> that implements the
-      <a><code>ContactsChangeEvent</code></a> interface at the
-      <a><code>ContactsManager</code></a> object
-
-      <section>
-        <h2>Event handlers</h2>
-        <p>The following are the <a>event handlers</a> (and their corresponding
-        <a>event handler event types</a>) that MUST be supported as attributes
-        by the <a>ContactsManager</a> object:
-        
-        <table class="simple">
-          <thead>
-            <tr>
-              <th>event handler</th>
-              <th>event handler event type</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong><code>oncontactschange</code></strong></td>
-              <td><code><dfn>contactschange</dfn></code></td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-    <p>The event named <a><code>contactschange</code></a> MUST implement the
-    <a>ContactsChangeEvent</a> interface.
+       </pre>
     </section>
 
-    <!-- - - - - - - - - ContactFindOptions Dictionary - - - - - - - - - - - -->
-    <section>
-      <h2><a>ContactFindOptions</a> Dictionary</h2>
-
-      <p>The <a>ContactFindOptions</a> dictionary represents the criteria used
-      to select the contacts to be returned by a <code>find</code> operation.
-      <dl title="dictionary ContactFindOptions"
-          class="idl">
-        <dt>DOMString value</dt>
-        <dd>Represents the value used for the filtering (e.g. "Tom").
-        <dt>FilterOperator operator</dt>
-        <dd>Represents the filtering operator used for the filtering.
-        <dt>sequence&lt;DOMString&gt; fields</dt>
-        <dd>Represents the set of fields in which the search is performed (e.g.
-        "givenName").
-        <dt>sequence&lt;DOMString&gt; sortBy</dt>
-        <dd>Represents the fields by which the results of the search are sorted
-        (e.g. ["givenNames", "familyNames"]). The results are sorted by the
-        first field, then by the following one, if present, and so on. 
-        <dt>SortOrder sortOrder</dt>
-        <dd>Represents the order in which the results of the search are sorted.
-        <dt>unsigned long resultsLimit</dt>
-        <dd>Represents the maximum number of results that can be returned by the
-        search operation.
-      </dl>
-
-    <section>
-      <h2>Enumerations</h2>
-
-      <p>There are 2 possible filter operations:
-      <dl class="idl" title="enum FilterOperator">
-            <dt>contains</dt>
-            <dd>
-                With this operation, a contact will be returned if its filtered
-                field contains the given value.
-            </dd>
-
-            <dt>is</dt>
-            <dd>
-                With this operation, a contact will be returned if its filtered
-                field matches exactly the given value.
-            </dd>
-      </dl>
-
-      <p>The returned contacts can be sorted in one of the following orders:
-      <dl class="idl" title="enum SortOrder">
-            <dt>ascending</dt>
-            <dd>
-                The contacts will be sorted in ascending order.
-            </dd>
-
-            <dt>descending</dt>
-            <dd>
-                The contacts will be sorted in descending order.
-            </dd>
-      </dl>
-      </section>
-      
-      <p class="issue">
-         It is for further study whether the level of flexibility of the filters
-         needs to be increased and/or additional mechanisms need to be put in
-         place so that applications can keep a local copy of the address book
-         and perform the filtering locally (e.g. startTrackingChanges() and
-         getNewChanges() methods)
-      </p>
-      
-    </section>       
+    <p class="issue">Which one is the system's default contacts datastore? the first one? Has a specific name?</p>
     
-    <!-- - - - - - - - -  ContactField Interface - - - - - - - - - - - - - - -->
     <section>
-      <h2><a>ContactField</a> Interface</h2>
-      <p>The <a>ContactField</a> interface represents a user's attribute and the
-      types associated to it.
-      <dl title="[Constructor(optional ContactFieldInit initDict)]
-                  interface ContactField"
-          class="idl">
-        <dt>attribute DOMString[] types</dt>
-        <dd>Indicates the types of this contact field (e.g. "home",
-        "work").</dd>
-        <dt>attribute boolean preferred</dt>
-        <dd>Indicates whether this is the preferred contact field.</dd>
-        <dt>attribute DOMString value</dt>
-        <dd>A string that contains the user's address.</dd>
-      </dl>
+      <h2>Data Store value type</h2>
 
-      <section> <h3><a>ContactFieldInit</a> Dictionary</h3>
-      <dl title="dictionary ContactFieldInit" class="idl">
-        <dt>sequence&lt;DOMString&gt; types</dt>
-        <dd>
-        <dt>boolean preferred</dt>
-        <dd>
-        <dt>DOMString value</dt>
-        <dd>
-      </dl>
-      </section>
-
-    </section>    
-    
-    <!-- - - - - - - - - ContactTelField Interface - - - - - - - - - - - - - -->
-    <section>
-      <h2><a>ContactTelField</a> Interface</h2>
-      <p>The <a>ContactTelField</a> interface represents a telephone number as
-      well as metadata associated to it, namely the types (e.g. "voice", "text")
-      and the carrier providing service to the telephony subscription associated
-      to that number.
-      <dl title="[Constructor(optional ContactTelFieldInit initDict)]
-                  interface ContactTelField : ContactField"
-          class="idl">
-        <dt>attribute DOMString? carrier</dt>
-        <dd>Indicates the carrier providing service to the telephony
-        subscription associated to that number</dd>
-      </dl>
-
-      <section> <h3><a>ContactTelFieldInit</a> Dictionary</h3>
-      <dl title="dictionary ContactTelFieldInit : ContactFieldInit" class="idl">
-        <dt>DOMString carrier</dt>
-        <dd>
-      </dl>
-      </section>
-
-    </section>    
-    
-    <!-- - - - - - - - - ContactAddress Interface - - - - - - - - - - - - - -->
-    <section>
-      <h2><a>ContactAddress</a> Interface</h2>
-      <p>The <a>ContactAddress</a> interface represents a user's physical
-      address and the types associated to it. This interface is based on <a
-      href="http://tools.ietf.org/html/rfc6350">vCard 4.0</a> ADR attribute.
-      <dl title="[Constructor(optional ContactAddressInit initDict)]
-                 interface ContactAddress"
-          class="idl">
-        <dt>attribute DOMString[] types</dt>
-        <dd>Indicates the types of this contact field (e.g. "home",
-        "work").</dd>
-        <dt>attribute boolean preferred</dt>
-        <dd>Indicates whether this is the preferred contact field.</dd>
-        <dt>attribute DOMString streetAddress</dt>
-        <dd>A string that contains the name of the street. It maps to the third
-        component in vCard's ADR attribute.</dd>
-        <dt>attribute DOMString locality</dt>
-        <dd>A string that contains the name of the locality. It maps to the
-        forth component in vCard's ADR attribute.</dd>
-        <dt>attribute DOMString region</dt>
-        <dd>A string that contains the name of the region. It maps to the fifth
-        component in vCard's ADR attribute.</dd>
-        <dt>attribute DOMString postalCode</dt>
-        <dd>A string that contains the postal code. It maps to the sixth
-        component in vCard's ADR attribute.</dd>
-        <dt>attribute DOMString countryName</dt>
-        <dd>A string that contains the name of the country. It maps to the
-        seventh component in vCard's ADR attribute.</dd>
-      </dl>
-
-      <section> <h3><a>ContactAddressInit</a> Dictionary</h3>
-      <dl title="dictionary ContactAddressInit" class="idl">
-        <dt>sequence&lt;DOMString&gt; types</dt>
-        <dd>
-        <dt>boolean preferred</dt>
-        <dd>
-        <dt>DOMString streetAddress</dt>
-        <dd>
-        <dt>DOMString locality</dt>
-        <dd>
-        <dt>DOMString region</dt>
-        <dd>
-        <dt>DOMString postalCode</dt>
-        <dd>
-        <dt>DOMString countryName</dt>
-        <dd>
-      </dl>
-      </section>
-    </section>    
-
-    <section>
-      <h2>The <code>ContactGender</code> enum</h2>
-      <dl title="enum ContactGender" class="idl">
-        <dt>male</dt>
-        <dd>contact is a male.</dd>
-        <dt>female</dt>
-        <dd>contact is a female.</dd>
-        <dt>other</dt>
-        <dd>contact has another gender.</dd>
-        <dt>none</dt>
-        <dd>contact does not have a gender (not applicable).</dd>
-        <dt>unknown</dt>
-        <dd>contact's gender is unknown.</dd>
-      </dl>
-    </section>
-
-    <!-- - - - - - - - - ContactName Interface - - - - - - - - - - - - - - - -->
-    <section>
-      <h2><a>ContactName</a> Interface</h2>
-      <p>The <a>ContactName</a> interface represents a user's naming attributes.
-      <dl title="[Constructor(optional ContactNameInit initDict)]
-                 interface ContactName"
-          class="idl">
-        <dt>attribute DOMString displayName</dt>
-        <dd>A string representing the contact's display name. It maps to vCard's
-        FN attribute.
-        <dt>attribute DOMString[] honorificPrefixes</dt>
-        <dd>A string or set thereof representing the contact's honorific
-        prefix(es). It maps to the forth component in vCard's N attribute.
-        <dt>attribute DOMString[] givenNames</dt>
-        <dd>A string or set thereof representing the contact's given name(s). It
-        maps to the second component in vCard's N attribute.
-        <dt>attribute DOMString[] additionalNames</dt>
-        <dd>A string or set thereof representing any additional name of the
-        contact. It maps to the third component in vCard's N attribute.
-        <dt>attribute DOMString[] familyNames</dt>
-        <dd>A string or set thereof representing the contact's family name(s).
-        It maps to the first component in vCard's N attribute.
-        <dt>attribute DOMString[] honorificSuffixes</dt>
-        <dd>A string or set thereof representing the contact's honorific
-        suffix(es). It maps to the fifth component in vCard's N attribute.
-        <dt>attribute DOMString[] nicknames</dt>
-        <dd>A string or set thereof representing the contact's nick name(s). It
-        maps to vCard's NICKNAME attribute.
-      </dl>
-
-      <section> <h3><a>ContactNameInit</a> Dictionary</h3>
-      <dl title="dictionary ContactNameInit" class="idl">
-        <dt>DOMString displayName</dt>
-        <dd>
-        <dt>sequence&lt;DOMString&gt; honorificPrefixes</dt>
-        <dd>
-        <dt>sequence&lt;DOMString&gt; givenNames</dt>
-        <dd>
-        <dt>sequence&lt;DOMString&gt; additionalNames</dt>
-        <dd>
-        <dt>sequence&lt;DOMString&gt; familyNames</dt>
-        <dd>
-        <dt>sequence&lt;DOMString&gt; honorificSuffixes</dt>
-        <dd>
-        <dt>sequence&lt;DOMString&gt; nicknames</dt>
-        <dd>
-      </dl>
-      </section>
-      
-    </section>
+      <p>The values stored in contacts data stores are of type <a>Contact</a>.</p>
 
     <!-- - - - - - - - - Contact Interface - - - - - - - - - - - - - - - - - -->
     <section>
-      <h2><a>Contact</a> Interface</h2>
+      <h3><a>Contact</a> Interface</h3>
       <p>The <a>Contact</a> interface represents a contact stored in the address
       book. As a principle the attributes are based on <a
       href="http://tools.ietf.org/html/rfc6350">vCard 4.0</a> and reuse the
@@ -589,8 +188,8 @@
       <dl title="[Constructor(optional ContactInit contactInitDict)]
                  interface Contact"
           class="idl">
-        <dt>readonly attribute DOMString? id</dt>
-        <dd>Represents a unique identifier of the contact in the address book.
+        <dt>readonly attribute DataStoreKey? id</dt>
+        <dd>Represents a unique identifier of the contact in the data store.
         <dt>readonly attribute Date? lastUpdated</dt>
         <dd>A <code>Date</code> element representing the date when the contact
         was last updated.
@@ -642,7 +241,7 @@
       </dl>
 
       <section>
-      <h3>Steps</h3>    
+      <h4>Steps</h4>    
       <p> The <a>Contact</a> interface's contructor when invoked MUST run the
       following steps:
        <ol>
@@ -659,7 +258,7 @@
        </ol>     
       </section>
       
-      <section> <h3><a>ContactInit</a> Dictionary</h3>
+      <section> <h4><a>ContactInit</a> Dictionary</h4>
       <dl title="dictionary ContactInit" class="idl">
         <dt>ContactName name</dt>
         <dd>
@@ -691,44 +290,180 @@
         <dd>
       </dl>
       </section>
+    </section>
 
-    </section>    
-    
-    <!-- - - - - - - - - ContactsChangeEvent Interface - - - - - - - - - - - -->
+    <!-- - - - - - - - -  ContactField Interface - - - - - - - - - - - - - - -->
     <section>
-      <h2><a>ContactsChangeEvent</a> Interface</h2>
-      <p>The <a>ContactsChangeEvent</a> interface represents events related to
-      the set of contacts that have been simultaneously added, removed and/or
-      modified. Changes that are applied to the address book in batches cause a
-      <a>ContactsChangeEvent</a> with multiple contact references to be fired,
-      whereas changes applied sequentially cause a <a>ContactsChangeEvent</a>
-      with a single contact reference to be fired
-      <dl title="[Constructor(DOMString type, optional ContactsChangeEventInit
-      eventInitDict)]
-                 interface ContactsChangeEvent : Event"
+      <h3><a>ContactField</a> Interface</h3>
+      <p>The <a>ContactField</a> interface represents a user's attribute and the
+      types associated to it.
+      <dl title="[Constructor(optional ContactFieldInit initDict)]
+                  interface ContactField"
           class="idl">
-        <dt>readonly attribute DOMString[] added</dt>
-        <dd>Indicates the identifier(s) of the <code>Contact</code> object(s)
-        that have been added.</dd>
-        <dt>readonly attribute DOMString[] modified</dt>
-        <dd>Indicates the identifier(s) of the <code>Contact</code> object(s)
-        that have been modified.</dd>
-        <dt>readonly attribute DOMString[] removed</dt>
-        <dd>Indicates the identifier(s) of the <code>Contact</code> object(s)
-        that have been removed.</dd>
+        <dt>attribute DOMString[] types</dt>
+        <dd>Indicates the types of this contact field (e.g. "home",
+        "work").</dd>
+        <dt>attribute boolean preferred</dt>
+        <dd>Indicates whether this is the preferred contact field.</dd>
+        <dt>attribute DOMString value</dt>
+        <dd>A string that contains the user's address.</dd>
       </dl>
 
-      <section> <h3><a>ContactsChangeEventInit</a> Dictionary</h3>
-      <dl title="dictionary ContactsChangeEventInit : EventInit" class="idl">
-        <dt>sequence&lt;DOMString&gt; added</dt>
+      <section> <h4><a>ContactFieldInit</a> Dictionary</h4>
+      <dl title="dictionary ContactFieldInit" class="idl">
+        <dt>sequence&lt;DOMString&gt; types</dt>
         <dd>
-        <dt>sequence&lt;DOMString&gt; modified</dt>
+        <dt>boolean preferred</dt>
         <dd>
-        <dt>sequence&lt;DOMString&gt; removed</dt>
+        <dt>DOMString value</dt>
         <dd>
       </dl>
       </section>
+
+    </section>    
+    
+    <!-- - - - - - - - - ContactTelField Interface - - - - - - - - - - - - - -->
+    <section>
+      <h3><a>ContactTelField</a> Interface</h3>
+      <p>The <a>ContactTelField</a> interface represents a telephone number as
+      well as metadata associated to it, namely the types (e.g. "voice", "text")
+      and the carrier providing service to the telephony subscription associated
+      to that number.
+      <dl title="[Constructor(optional ContactTelFieldInit initDict)]
+                  interface ContactTelField : ContactField"
+          class="idl">
+        <dt>attribute DOMString? carrier</dt>
+        <dd>Indicates the carrier providing service to the telephony
+        subscription associated to that number</dd>
+      </dl>
+
+      <section> <h4><a>ContactTelFieldInit</a> Dictionary</h4>
+      <dl title="dictionary ContactTelFieldInit : ContactFieldInit" class="idl">
+        <dt>DOMString carrier</dt>
+        <dd>
+      </dl>
+      </section>
+
+    </section>    
+    
+    <!-- - - - - - - - - ContactAddress Interface - - - - - - - - - - - - - -->
+    <section>
+      <h3><a>ContactAddress</a> Interface</h3>
+      <p>The <a>ContactAddress</a> interface represents a user's physical
+      address and the types associated to it. This interface is based on <a
+      href="http://tools.ietf.org/html/rfc6350">vCard 4.0</a> ADR attribute.
+      <dl title="[Constructor(optional ContactAddressInit initDict)]
+                 interface ContactAddress"
+          class="idl">
+        <dt>attribute DOMString[] types</dt>
+        <dd>Indicates the types of this contact field (e.g. "home",
+        "work").</dd>
+        <dt>attribute boolean preferred</dt>
+        <dd>Indicates whether this is the preferred contact field.</dd>
+        <dt>attribute DOMString streetAddress</dt>
+        <dd>A string that contains the name of the street. It maps to the third
+        component in vCard's ADR attribute.</dd>
+        <dt>attribute DOMString locality</dt>
+        <dd>A string that contains the name of the locality. It maps to the
+        forth component in vCard's ADR attribute.</dd>
+        <dt>attribute DOMString region</dt>
+        <dd>A string that contains the name of the region. It maps to the fifth
+        component in vCard's ADR attribute.</dd>
+        <dt>attribute DOMString postalCode</dt>
+        <dd>A string that contains the postal code. It maps to the sixth
+        component in vCard's ADR attribute.</dd>
+        <dt>attribute DOMString countryName</dt>
+        <dd>A string that contains the name of the country. It maps to the
+        seventh component in vCard's ADR attribute.</dd>
+      </dl>
+
+      <section> <h4><a>ContactAddressInit</a> Dictionary</h4>
+      <dl title="dictionary ContactAddressInit" class="idl">
+        <dt>sequence&lt;DOMString&gt; types</dt>
+        <dd>
+        <dt>boolean preferred</dt>
+        <dd>
+        <dt>DOMString streetAddress</dt>
+        <dd>
+        <dt>DOMString locality</dt>
+        <dd>
+        <dt>DOMString region</dt>
+        <dd>
+        <dt>DOMString postalCode</dt>
+        <dd>
+        <dt>DOMString countryName</dt>
+        <dd>
+      </dl>
+      </section>
+    </section>    
+
+    <section>
+      <h3>The <code>ContactGender</code> enum</h3>
+      <dl title="enum ContactGender" class="idl">
+        <dt>male</dt>
+        <dd>contact is a male.</dd>
+        <dt>female</dt>
+        <dd>contact is a female.</dd>
+        <dt>other</dt>
+        <dd>contact has another gender.</dd>
+        <dt>none</dt>
+        <dd>contact does not have a gender (not applicable).</dd>
+        <dt>unknown</dt>
+        <dd>contact's gender is unknown.</dd>
+      </dl>
     </section>
+
+    <!-- - - - - - - - - ContactName Interface - - - - - - - - - - - - - - - -->
+    <section>
+      <h3><a>ContactName</a> Interface</h3>
+      <p>The <a>ContactName</a> interface represents a user's naming attributes.
+      <dl title="[Constructor(optional ContactNameInit initDict)]
+                 interface ContactName"
+          class="idl">
+        <dt>attribute DOMString displayName</dt>
+        <dd>A string representing the contact's display name. It maps to vCard's
+        FN attribute.
+        <dt>attribute DOMString[] honorificPrefixes</dt>
+        <dd>A string or set thereof representing the contact's honorific
+        prefix(es). It maps to the forth component in vCard's N attribute.
+        <dt>attribute DOMString[] givenNames</dt>
+        <dd>A string or set thereof representing the contact's given name(s). It
+        maps to the second component in vCard's N attribute.
+        <dt>attribute DOMString[] additionalNames</dt>
+        <dd>A string or set thereof representing any additional name of the
+        contact. It maps to the third component in vCard's N attribute.
+        <dt>attribute DOMString[] familyNames</dt>
+        <dd>A string or set thereof representing the contact's family name(s).
+        It maps to the first component in vCard's N attribute.
+        <dt>attribute DOMString[] honorificSuffixes</dt>
+        <dd>A string or set thereof representing the contact's honorific
+        suffix(es). It maps to the fifth component in vCard's N attribute.
+        <dt>attribute DOMString[] nicknames</dt>
+        <dd>A string or set thereof representing the contact's nick name(s). It
+        maps to vCard's NICKNAME attribute.
+      </dl>
+
+      <section> <h4><a>ContactNameInit</a> Dictionary</h4>
+      <dl title="dictionary ContactNameInit" class="idl">
+        <dt>DOMString displayName</dt>
+        <dd>
+        <dt>sequence&lt;DOMString&gt; honorificPrefixes</dt>
+        <dd>
+        <dt>sequence&lt;DOMString&gt; givenNames</dt>
+        <dd>
+        <dt>sequence&lt;DOMString&gt; additionalNames</dt>
+        <dd>
+        <dt>sequence&lt;DOMString&gt; familyNames</dt>
+        <dd>
+        <dt>sequence&lt;DOMString&gt; honorificSuffixes</dt>
+        <dd>
+        <dt>sequence&lt;DOMString&gt; nicknames</dt>
+        <dd>
+      </dl>
+      </section>
+      
+    </section>
+    </section>    
 
     <!-- - - - - - - - - Acknowledgements - - - - - - - - - - - - - - - - - -->
     <section>
